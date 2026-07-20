@@ -1,4 +1,4 @@
-﻿namespace Sms.Client;
+﻿namespace Sms.Models;
 
 public class Class1
 {
