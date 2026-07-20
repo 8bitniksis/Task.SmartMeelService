@@ -1,46 +1,69 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
 using Serilog;
-using Serilog.Core; // Может не понадобиться, но добавим на всякий случай, если понадобится ILogger явно
+
+using Sms.WpfEnvManager.Services;
+
 using System.IO;
 using System.Windows;
 
-namespace Sms.WpfEnvManager
+namespace Sms.WpfEnvManager;
+
+public partial class App : Application
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
-    public partial class App : Application
+    private IHost? _host;
+
+    protected override async void OnStartup(StartupEventArgs e)
     {
-        public static IConfiguration Configuration { get; private set; } = null!;
-        // Изменяем тип на конкретный Serilog.ILogger
-        public static Serilog.ILogger Logger { get; private set; } = null!; 
+        var builder = Host.CreateApplicationBuilder();
 
-        protected override void OnStartup(StartupEventArgs e)
-        {
-            base.OnStartup(e);
+        builder.Configuration
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false);
 
-            // 1. Настройка Serilog
-            var logFileName = $"test-sms-wpf-app-{System.DateTime.UtcNow:yyyyMMdd}.log";
-            // Убедимся, что присваиваем Serilog.ILogger
-            Logger = new LoggerConfiguration()
-                .WriteTo.Console()
-                .WriteTo.File(logFileName, rollingInterval: RollingInterval.Day)
-                .CreateLogger(); 
+        var logsDirectory = Path.Combine(
+            AppContext.BaseDirectory,
+            "Logs");
 
-            // 2. Загрузка конфигурации
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-            Configuration = builder.Build();
+        Directory.CreateDirectory(logsDirectory);
 
-            // Логирование старта приложения
-            Logger.Information("Application started.");
-        }
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.File(
+                Path.Combine(
+                    logsDirectory,
+                    $"test-sms-wpf-app-{DateTime.Now:yyyyMMdd}.log"))
+            .CreateLogger();
 
-        protected override void OnExit(ExitEventArgs e)
-        {
-            base.OnExit(e);
-            Logger.Information("Application exit.");
-        }
+        builder.Services.AddSingleton(Log.Logger);
+
+        builder.Services.AddSingleton<EnvironmentConfiguration>();
+
+        builder.Services.AddSingleton<IEnvironmentVariableService,
+            EnvironmentVariableService>();
+
+        builder.Services.AddSingleton<MainWindow>();
+
+        _host = builder.Build();
+
+        await _host.StartAsync();
+
+        var window = _host.Services.GetRequiredService<MainWindow>();
+
+        window.Show();
+
+        base.OnStartup(e);
+    }
+
+    protected override async void OnExit(ExitEventArgs e)
+    {
+        if (_host is not null)
+            await _host.StopAsync();
+
+        Log.CloseAndFlush();
+
+        base.OnExit(e);
     }
 }
