@@ -23,10 +23,8 @@ builder.Services.AddSerilog();
 
 builder.Services.AddSmsClient(builder.Configuration);
 
-builder.Services.AddTransient<Application>();
+builder.Services.AddHostedService<Application>();
 
 using var host = builder.Build();
 
-var app = host.Services.GetRequiredService<Application>();
-
-await app.RunAsync();
+await host.RunAsync();
