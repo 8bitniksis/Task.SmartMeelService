@@ -7,24 +7,34 @@ using Serilog;
 using Sms.Client;
 using Sms.Console.Services;
 
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.Configuration.AddJsonFile(
-    "appsettings.json",
-    optional: false,
-    reloadOnChange: true);
-
 Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
     .WriteTo.Console()
     .CreateLogger();
 
-builder.Services.AddSerilog();
+try
+{
+    var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddSmsClient(builder.Configuration);
+    builder.Configuration.AddJsonFile(
+        "appsettings.json",
+        optional: false,
+        reloadOnChange: true);
 
-builder.Services.AddHostedService<Application>();
+    builder.Services.AddSerilog();
 
-using var host = builder.Build();
+    builder.Services.AddSmsClient(builder.Configuration);
 
-await host.RunAsync();
+    builder.Services.AddHostedService<Application>();
+
+    using var host = builder.Build();
+
+    await host.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
