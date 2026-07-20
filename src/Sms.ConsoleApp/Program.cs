@@ -60,7 +60,19 @@ try
 
     // Step 3: Save to DB and Print
     Log.Information("Saving menu to database...");
-    await context.Dishes.AddRangeAsync(dishes);
+    // --- ИСПРАВЛЕНО: Преобразование List<Dish> в List<DishEntity> ---
+    var dishEntities = dishes.Select(d => new DishEntity
+    {
+        Id = d.Id,
+        Article = d.Article,
+        Name = d.Name,
+        Price = d.Price,
+        IsWeighted = d.IsWeighted,
+        FullPath = d.FullPath
+        // Barcodes не сохраняем в БД в этой версии
+    }).ToList();
+
+    await context.Dishes.AddRangeAsync(dishEntities);
     await context.SaveChangesAsync(); // Batch save for efficiency
     Log.Information("Menu saved to database.");
 
@@ -124,7 +136,7 @@ try
 
         // Step 6: Validate codes exist and quantities are positive
         bool allCodesValid = true;
-        var availableArticles = dishes.Select(d => d.Article).ToHashSet();
+        var availableArticles = dishes.Select(d => d.Article).ToHashSet(); // Проверяем по оригинальным Dish
         foreach (var (articleCode, quantity) in inputItems)
         {
             if (!availableArticles.Contains(articleCode))
@@ -144,7 +156,7 @@ try
 
     // Step 7: Add validated items to order and send
     Log.Information("Building order from user input...");
-    var dishLookup = dishes.ToDictionary(d => d.Article, d => d.Id); // Map Article -> Id
+    var dishLookup = dishes.ToDictionary(d => d.Article, d => d.Id); // Map Article -> Id, снова используем оригинальные Dish
     foreach (var (articleCode, quantity) in inputItems)
     {
         order.Items.Add(new OrderItem { Id = dishLookup[articleCode], Quantity = quantity });
@@ -222,12 +234,12 @@ public class DishDbContext : DbContext
 // EF Core entity mapping Dish model
 public class DishEntity
 {
-    public string Id { get; set; } = string.Empty;
-    public string Article { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
+    public string Id { get; set; } = string.Empty; // CS8600: Исправлено - используем инициализатор
+    public string Article { get; set; } = string.Empty; // CS8600: Исправлено - используем инициализатор
+    public string Name { get; set; } = string.Empty; // CS8600: Исправлено - используем инициализатор
     public double Price { get; set; }
     public bool IsWeighted { get; set; }
-    public string FullPath { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty; // CS8600: Исправлено - используем инициализатор
     // Note: Collections like Barcodes might need special handling (e.g., JSON column or separate table)
     // For simplicity here, we might store them as a JSON string if needed, or map differently.
     // Let's assume Barcodes are not stored in DB for this example, just fetched/displayed.
